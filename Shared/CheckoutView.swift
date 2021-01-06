@@ -30,17 +30,21 @@ struct CheckoutView: View {
             }
         }
         .navigationBarTitle("Check out", displayMode: .inline)
-        .alert(isPresented: $showingConfirmation) {
-            Alert(title: Text("Thank you!"), message: Text(confirmationMessage), dismissButton: .default(Text("OK")))
+        .alert(isPresented: $showingAlert) {
+            Alert(title: Text(alertTitle), message: Text(alertMessage), dismissButton: .default(Text("OK")))
         }
     }
     
-    @State private var confirmationMessage = ""
-    @State private var showingConfirmation = false
+    @State private var alertMessage = ""
+    @State private var alertTitle = ""
+    @State private var showingAlert = false
     
     func placeOrder() {
         guard let encoded = try? JSONEncoder().encode(order) else {
             print("Failed to encode order")
+            alertTitle = "Error"
+            alertMessage = "Cannot prepare order."
+            showingAlert = true
             return
         }
         
@@ -51,16 +55,31 @@ struct CheckoutView: View {
         request.httpBody = encoded
         
         URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Error: \(error.localizedDescription).")
+                self.alertTitle = "Error"
+                self.alertMessage = "Unknown error."
+                self.showingAlert = true
+                return
+            }
+            
             guard let data = data else {
                 print("No data in response: \(error?.localizedDescription ?? "Unknown error").")
+                self.alertTitle = "Error"
+                self.alertMessage = "Cannot receive confirmation, contact the store."
+                self.showingAlert = true
                 return
             }
             
             if let decodedOrder = try? JSONDecoder().decode(Order.self, from: data) {
-                self.confirmationMessage = "Your order for \(decodedOrder.quantity)x \(Order.types[decodedOrder.type].lowercased()) cupcakes is on its way!"
-                self.showingConfirmation = true
+                self.alertTitle = "Thank you!"
+                self.alertMessage = "Your order for \(decodedOrder.quantity)x \(Order.types[decodedOrder.type].lowercased()) cupcakes is on its way!"
+                self.showingAlert = true
             } else {
                 print("Invalid response from server")
+                self.alertTitle = "Error"
+                self.alertMessage = "Invalid response."
+                self.showingAlert = true
             }
         }.resume()
     }
